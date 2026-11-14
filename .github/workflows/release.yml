@@ -2,30 +2,24 @@ name: Release
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag"
+        required: true
+        default: "v1.0.0"
 permissions:
   contents: write
+env:
+  TAG: ${{ github.event.inputs.tag || github.ref_name }}
+  GH_TOKEN: ${{ github.token }}
 jobs:
-  create:
-    runs-on: ubuntu-latest
-    steps:
-      - run: gh release view "${{ github.ref_name }}" --repo "${{ github.repository }}" || gh release create "${{ github.ref_name }}" --repo "${{ github.repository }}" --title "${{ github.ref_name }}" --notes "Standalone builds of session-guard"
-        env:
-          GH_TOKEN: ${{ github.token }}
   build:
-    needs: create
-    strategy:
-      matrix:
-        include:
-          - os: windows-latest
-            built: dist/session_guard.exe
-            asset: session_guard-windows.exe
-          - os: macos-latest
-            built: dist/session_guard
-            asset: session_guard-macos
-          - os: ubuntu-latest
-            built: dist/session_guard
-            asset: session_guard-linux
-    runs-on: ${{ matrix.os }}
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+        working-directory: .   # change to session-guard if your files are in that folder
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
@@ -33,9 +27,7 @@ jobs:
           python-version: "3.12"
       - run: pip install -r requirements.txt pyinstaller
       - run: pyinstaller --onefile session_guard.py
-      - shell: bash
-        run: |
-          cp "${{ matrix.built }}" "${{ matrix.asset }}"
-          gh release upload "${{ github.ref_name }}" "${{ matrix.asset }}" --clobber
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - run: |
+          gh release view "$TAG" --repo "${{ github.repository }}" || gh release create "$TAG" --repo "${{ github.repository }}" --title "$TAG" --notes "Windows build of session-guard"
+          cp dist/session_guard.exe session_guard-windows.exe
+          gh release upload "$TAG" session_guard-windows.exe --clobber --repo "${{ github.repository }}"
