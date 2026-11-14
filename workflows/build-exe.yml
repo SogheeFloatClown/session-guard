@@ -1,0 +1,25 @@
+name: Build exe
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Build
+        shell: bash
+        run: |
+          if [ -f session_guard.py ]; then cd .; elif [ -f session-guard/session_guard.py ]; then cd session-guard; else echo "session_guard.py not found"; ls -R; exit 1; fi
+          pip install -r requirements.txt pyinstaller
+          pyinstaller --onefile session_guard.py
+          mkdir -p "$GITHUB_WORKSPACE/out"
+          cp dist/session_guard.exe "$GITHUB_WORKSPACE/out/"
+      - uses: actions/upload-artifact@v5
+        with:
+          name: session_guard-windows
+          path: out/session_guard.exe
