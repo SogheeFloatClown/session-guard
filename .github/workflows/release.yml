@@ -1,33 +1,28 @@
-name: Release
+name: Build exe
 on:
+  workflow_dispatch:
   push:
     tags: ["v*"]
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: "Release tag"
-        required: true
-        default: "v1.0.0"
-permissions:
-  contents: write
-env:
-  TAG: ${{ github.event.inputs.tag || github.ref_name }}
-  GH_TOKEN: ${{ github.token }}
 jobs:
   build:
     runs-on: windows-latest
-    defaults:
-      run:
-        shell: bash
-        working-directory: .   # change to session-guard if your files are in that folder
     steps:
       - uses: actions/checkout@v6
+      - name: Show repo layout
+        shell: bash
+        run: ls -la && ls -la session-guard 2>/dev/null || true
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-      - run: pip install -r requirements.txt pyinstaller
-      - run: pyinstaller --onefile session_guard.py
-      - run: |
-          gh release view "$TAG" --repo "${{ github.repository }}" || gh release create "$TAG" --repo "${{ github.repository }}" --title "$TAG" --notes "Windows build of session-guard"
-          cp dist/session_guard.exe session_guard-windows.exe
-          gh release upload "$TAG" session_guard-windows.exe --clobber --repo "${{ github.repository }}"
+      - name: Build
+        shell: bash
+        run: |
+          if [ -f session_guard.py ]; then cd .; elif [ -f session-guard/session_guard.py ]; then cd session-guard; else echo "session_guard.py not found"; exit 1; fi
+          pip install -r requirements.txt pyinstaller
+          pyinstaller --onefile session_guard.py
+          mkdir -p "$GITHUB_WORKSPACE/out"
+          cp dist/session_guard.exe "$GITHUB_WORKSPACE/out/"
+      - uses: actions/upload-artifact@v5
+        with:
+          name: session_guard-windows
+          path: out/session_guard.exe
